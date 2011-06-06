@@ -180,8 +180,14 @@ class SearchBackend(BaseSearchBackend):
             kwargs.update(spatial)
         
         if dismax is not None:
-            kwargs.update({'defType' : 'dismax', 'qf' : ["%s^%s" % (q[0], float(q[1])) for q in dismax['qf']], 'pf' : ["%s^%s" % (q[0], float(q[1])) for q in dismax['pf']]})
-        
+            kwargs.update({'defType' : 'dismax', 
+                           'qf' : ["%s^%s" % (q[0], float(q[1])) for q in dismax['qf']], 
+                           'pf' : ["%s^%s" % (q[0], float(q[1])) for q in dismax['pf']],
+                           'bf' : ["recip(rord(%s),1,1000,1000)^%s" % (q[0], float(q[1])) for q in dismax['bf']],
+                           })
+            
+            
+            
         try:
             raw_results = self.conn.search(query_string, **kwargs)
         except (IOError, SolrError), e:
