@@ -345,6 +345,22 @@ class SearchQuerySet(object):
         clone.query.add_narrow_query(query)
         return clone
     
+    def spatial_center_on(self, field, lat, lon, radius):
+        """
+        Add spatial filter to a query
+        """
+        
+        clone = self._clone()
+        clone.query.add_spatial(sfield = field, pt="%s,%s" % (lat,lon), d=radius, fq="{!bbox}")
+        
+        return clone
+    
+    def dismax(self, pf=None, qf=None, bf=None):
+        clone = self._clone()
+        clone.query.add_dismax(pf, qf, bf)
+        
+        return clone
+    
     def raw_search(self, query_string, **kwargs):
         """Passes a raw query directly to the backend."""
         clone = self._clone()

@@ -100,7 +100,7 @@ class SearchBackend(BaseSearchBackend):
     def search(self, query_string, sort_by=None, start_offset=0, end_offset=None,
                fields='', highlight=False, facets=None, date_facets=None, query_facets=None,
                narrow_queries=None, spelling_query=None,
-               limit_to_registered_models=None, result_class=None, **kwargs):
+               limit_to_registered_models=None, result_class=None, spatial=None, dismax=None, **kwargs):
         if len(query_string) == 0:
             return {
                 'results': [],
@@ -175,6 +175,12 @@ class SearchBackend(BaseSearchBackend):
         
         if narrow_queries is not None:
             kwargs['fq'] = list(narrow_queries)
+        
+        if spatial is not None:
+            kwargs.update(spatial)
+        
+        if dismax is not None:
+            kwargs.update({'defType' : 'dismax', 'qf' : ["%s^%s" % (q[0], float(q[1])) for q in dismax['qf']], 'pf' : ["%s^%s" % (q[0], float(q[1])) for q in dismax['pf']]})
         
         try:
             raw_results = self.conn.search(query_string, **kwargs)
@@ -373,7 +379,17 @@ class SearchQuery(BaseSearchQuery):
             self.backend = backend
         else:
             self.backend = SearchBackend(site=site)
-
+    
+        self._spatial = None
+        self._dismax = None
+        
+    def add_spatial(self, sfield, pt, d, fq = None):
+        self._spatial = {'sfield' : sfield, 'pt' : pt, 'd' : d}
+        if fq is not None:
+            self._spatial['fq'] = fq
+    
+    def add_dismax(self, pf=None, qf=None, bf=None):
+        self._dismax = {'pf' : pf if pf is not None else [], 'qf':qf if qf is not None else [],'bf': bf if bf is not None else []}
     def matching_all_fragment(self):
         return '*:*'
 
@@ -464,6 +480,12 @@ class SearchQuery(BaseSearchQuery):
         if spelling_query:
             kwargs['spelling_query'] = spelling_query
         
+        if self._spatial is not None:
+            kwargs['spatial'] = self._spatial
+            
+        if self._dismax is not None:
+            kwargs['dismax'] = self._dismax
+        
         results = self.backend.search(final_query, **kwargs)
         self._results = results.get('results', [])
         self._hit_count = results.get('hits', 0)
@@ -487,3 +509,9 @@ class SearchQuery(BaseSearchQuery):
         results = self.backend.more_like_this(self._mlt_instance, additional_query_string, **kwargs)
         self._results = results.get('results', [])
         self._hit_count = results.get('hits', 0)
+
+    def _clone(self, klass=None):
+        clone = super(SearchQuery, self)._clone(klass)
+        clone._spatial = self._spatial
+        clone._dismax = self._dismax
+        return clone
